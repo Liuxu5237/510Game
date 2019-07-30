@@ -1,0 +1,11 @@
+/baks
+/client_publish
+/.vscode
+.DS_Store
+ciphercode/
+bin/
+obj/
+gen/
+cocos2d-x/
+*.class
+UserInterfaceState.xcuserstate
