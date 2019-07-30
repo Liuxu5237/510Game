@@ -95,7 +95,7 @@ function GameLayer:onExitTable()
         self:runAction(cc.Sequence:create(
             cc.CallFunc:create(
                 function () 
-                    self:sendCancelOccupy()
+                    --self:sendCancelOccupy()
                     self._gameFrame:StandUp(1)
                 end
                 ),
@@ -143,8 +143,17 @@ function GameLayer:sendUserBet( cbArea, lScore )
     local cmddata = ExternalFun.create_netdata(g_var(cmd).CMD_C_PlaceBet)
     cmddata:pushbyte(cbArea)
     cmddata:pushscore(lScore)
-
     self:SendData(g_var(cmd).SUB_C_PLACE_JETTON, cmddata)
+end
+
+--玩家异常下注
+function GameLayer:sendUserTryBet( area, nJettonSelect,lUserScore,lHaveJetton )
+    local cmddata = ExternalFun.create_netdata(g_var(cmd).CMD_C_TRYPlaceBet)
+    cmddata:pushbyte(area)   --区域
+    cmddata:pushscore(nJettonSelect)--金额
+    cmddata:pushscore(lUserScore)--当前身上的钱钱
+    cmddata:pushscore(lHaveJetton)--已下注的钱钱
+    self:SendData(g_var(cmd).SUB_C_TRYJET, cmddata)
 end
 
 --控制
@@ -348,6 +357,7 @@ end
 function GameLayer:onEventGameSceneEnd( dataBuffer )
    local cmd_table = ExternalFun.read_netdata(g_var(cmd).CMD_S_StatusPlay, dataBuffer)
 --    --保存游戏结果
+dump(cmd_table)
     self._dataModle.m_tabGameEndCmd = cmd_table
 
      --申请条件
@@ -366,7 +376,9 @@ function GameLayer:onEventGameSceneEnd( dataBuffer )
     for i=1,g_var(cmd).AREA_MAX do
         --界面已下注
         ll = cmd_table.lAllBet[1][i]
-        if ll >0 then 
+        if ll >0 then
+            --变态 让不显示
+            --self._gameView:reEnterGameBet(i, 0)
             self._gameView:reEnterGameBet(i, ll)
         end        
         --玩家下注

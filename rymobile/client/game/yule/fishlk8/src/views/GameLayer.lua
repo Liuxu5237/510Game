@@ -23,9 +23,9 @@ local scheduler = cc.Director:getInstance():getScheduler()
 local Game_CMD = appdf.req(module_pre .. ".models.CMD_LKPYGame")
 
 
-local delayLeaveTime = 0.3
+local delayLeaveTime = 0
 
-local exit_timeOut = 3
+local exit_timeOut = 5
 local SYNC_SECOND = 1
 
 local winsize = cc.Director:getInstance():getVisibleSize()
@@ -42,7 +42,7 @@ function GameLayer:ctor(frameEngine, scene)
     -- 创建物理世界
     cc.Director:getInstance():getRunningScene():initWithPhysics()
     cc.Director:getInstance():getRunningScene():getPhysicsWorld():setGravity(cc.p(0, -100))
-
+    self.isEightFour = false
     -- 鱼层
     self.fishBg = cc.Layer:create()
     self.m_fishLayer = cc.Layer:create()
@@ -79,6 +79,9 @@ function GameLayer:ctor(frameEngine, scene)
     self:setReversal()
     self:setPath()
     -- dyj1
+    self.b_isTenSend = 0
+    self.m_arrContact_fish = { }
+    self.m_arrContact_bullet = { }
 
     self.bullet = { }
     self.diebullet = { }
@@ -90,7 +93,7 @@ function GameLayer:ctor(frameEngine, scene)
     self.Tcount = 0
     self.FirstTime = 0
     self.ScoreM = 0
-    self.ScoreCount = 0
+    self.ScoreCount = GlobalUserItem.lUserScore --0 ->改为身上分数  这次不能为0了吧
     self.Copylscore = self.m_pUserItem.lScore
     -- 拷贝一个用户分数用来进行运算显示
     self.BulletSum = 0
@@ -108,7 +111,7 @@ function GameLayer:ctor(frameEngine, scene)
     self.bFishStop = false
 
     -- dyj2
-
+    self.reGameOption = false
 
     if self._dataModel.m_reversal then
         -- 物理世界旋转180
@@ -193,6 +196,19 @@ function GameLayer:addEvent()
             self.m_cannonLayer:updateUpScore(self.ScoreCount, cannon.m_pos + 1)
         end
         
+
+        --给大哥个面子 在这里添加桌上的用户 我就不信了
+
+        local nowTable = self.m_pUserItem.wTableID
+        --dump(self._gameFrame._UserList)
+        for k,v in pairs(self._gameFrame._UserList) do
+            -- dump(v)
+            -- print(v["wTableID"] )
+            if nowTable == v["wTableID"]  then
+                self:onEventUserEnter(v["wTableID"],v["wChairID"],v)
+            end 
+        end
+
     end
 
     local listener = cc.EventListenerCustom:create(Game_CMD.Event_LoadingFinish, eventListener)
@@ -244,12 +260,13 @@ function GameLayer:addContact()
                 fish = b
             end
         end
-
         -- dyj1          碰撞出网清除子弹以及附带数据
         if nil ~= bullet then
             if nil ~= fish then
                 fish:runAction(cc.Sequence:create(cc.TintTo:create(0.2, 255, 0, 0), cc.TintTo:create(0.2, 255, 255, 255)))
-                self:AsendCathcFish(bullet, fish)
+                --if self.m_nChairID == bullet.chairId then
+                    self:AsendCathcFish(bullet, fish)
+                --end
                 bullet:fallingNet(fish)
                 bullet.ifdie = true
             end
@@ -266,26 +283,36 @@ function GameLayer:addContact()
 end
 
 function GameLayer:AsendCathcFish(bullet, fish)
-
     if bullet:getTag() ~= Game_CMD.Tag_Laser then
         if bullet.m_cannon ~= nil and bullet.m_cannon.m_ChairID == nil then
             return
         end
     end
-
-    local cmddata = CCmd_Data:create(18)
-    cmddata:setcmdinfo(yl.MDM_GF_GAME, Game_CMD.SUB_C_CATCH_FISH);
-    cmddata:pushword(bullet.chairId)
-    cmddata:pushint(fish.m_data.fish_id)
-    cmddata:pushint(bullet.m_Type)
-    cmddata:pushint(bullet.m_index)
-    cmddata:pushint(bullet.m_nScore)
-
-
-    -- 发送失败
-    if not self._gameFrame:sendSocketData(cmddata) then
-        self._gameFrame._callBack(-1, "发送开火息失败")
+    -- if bullet.chairId == self.m_nChairID then
+    --     print("发送捕鱼信息")
+    -- end
+    -- if self.m_nChairID == bullet.chairId then
+    --     dump(self._dataModel.m_fishList)
+    --     print(fish.m_data.fish_id)
+    -- end
+    if self.isEightFour == true then
+        return
     end
+    -- local cmddata = CCmd_Data:create(18)
+    -- cmddata:setcmdinfo(yl.MDM_GF_GAME, Game_CMD.SUB_C_CATCH_FISH);
+    -- cmddata:pushword(bullet.chairId)
+    -- cmddata:pushint(fish.m_data.fish_id)
+    -- cmddata:pushint(bullet.m_Type)
+    -- cmddata:pushint(bullet.m_index)
+    -- cmddata:pushint(bullet.m_nScore) 
+    
+    table.insert(self.m_arrContact_fish , fish:retain())
+    table.insert(self.m_arrContact_bullet , bullet:retain())
+    
+    -- -- 发送失败
+    -- if not self._gameFrame:sendSocketData(cmddata) then
+    --     self._gameFrame._callBack(-1, "发送开火息失败")
+    -- end
 
 end
 function GameLayer:setPath()
@@ -460,6 +487,54 @@ function GameLayer:setSecondCount(dt)
 
 end
 
+function GameLayer:updateContact(dt)
+    
+    if self.isEightFour == true then
+        if nil ~= self.m_scheduleUpdateContact then
+            scheduler:unscheduleScriptEntry(self.m_scheduleUpdateContact)
+            self.m_scheduleUpdateContact = nil
+        end
+        return
+    end
+  
+    self.b_isTenSend = self.b_isTenSend + 1
+    --print("一帧" ..self.b_isTenSend )
+    if #self.m_arrContact_bullet > 0 then
+        local arContact = self.m_arrContact_bullet
+        local isMe  = false
+        --print("一帧发送 " .. #arContact)
+        local cmddata = CCmd_Data:create(18* (#arContact))
+        cmddata:setcmdinfo(yl.MDM_GF_GAME, Game_CMD.SUB_C_CATCH_FISH);
+        for i=1,#arContact do
+            while true do
+                if self.m_arrContact_bullet[i].chairId == self.m_nChairID then
+                    isMe = true
+                end
+                break
+            end  
+        end
+
+        if isMe == true  or self.b_isTenSend%10 == 0 then
+            self.b_isTenSend = 0
+            --print("确认发送 ".. #arContact) 
+            for i = #arContact, 1, -1 do    
+                cmddata:pushword(self.m_arrContact_bullet[i].chairId)
+                cmddata:pushint(self.m_arrContact_fish[i].m_data.fish_id)
+                cmddata:pushint(self.m_arrContact_bullet[i].m_Type)
+                cmddata:pushint(self.m_arrContact_bullet[i].m_index)
+                cmddata:pushint(self.m_arrContact_bullet[i].m_nScore)
+                table.remove(self.m_arrContact_bullet , i)
+                table.remove(self.m_arrContact_fish , i)
+            end
+
+            if not self._gameFrame:sendSocketData(cmddata) then
+                self._gameFrame._callBack(-1, "发送开火息失败")
+            end
+        end
+        
+    end
+    
+end
 
 -- 创建定时器
 function GameLayer:onCreateSchedule()
@@ -500,6 +575,9 @@ function GameLayer:onCreateSchedule()
         self:updateBullet(dt)
     end
 
+    local function Contact_update(dt)
+        self:updateContact(dt)
+    end
     -- 游戏定时器
     if nil == self.m_scheduleUpdate then
         self.m_scheduleUpdate = scheduler:scheduleScriptFunc(update_fish, 0.031, false)
@@ -507,6 +585,10 @@ function GameLayer:onCreateSchedule()
 
     if nil == self.m_scheduleUpdateBullet then
         self.m_scheduleUpdateBullet = scheduler:scheduleScriptFunc(bullet_update, 0.031, false)
+    end
+
+    if nil == self.m_scheduleUpdateContact then
+        self.m_scheduleUpdateContact = scheduler:scheduleScriptFunc(Contact_update, 1/60, false)
     end
 
 end
@@ -853,6 +935,10 @@ function GameLayer:unSchedule()
         scheduler:unscheduleScriptEntry(self.m_scheduleUpdateBullet)
         self.m_scheduleUpdateBullet = nil
     end
+    if nil ~= self.m_scheduleUpdateContact then
+        scheduler:unscheduleScriptEntry(self.m_scheduleUpdateContact)
+        self.m_scheduleUpdateContact = nil
+    end
 
     -- 60秒倒计时定时器
     if nil ~= self.m_secondCountSchedule then
@@ -922,11 +1008,9 @@ end
 
 -- 用户进入
 function GameLayer:onEventUserEnter(wTableID, wChairID, useritem)
-
     if wTableID ~= self.m_nTableID or useritem.cbUserStatus == yl.US_LOOKON or not self.m_cannonLayer then
         return
     end
-
     self.m_cannonLayer:onEventUserEnter(wTableID, wChairID, useritem)
     -- dyj1(Fc++)
     local systime = currentTime()
@@ -942,7 +1026,9 @@ function GameLayer:onEventUserStatus(useritem, newstatus, oldstatus)
         return
     end
 
-
+    if self._dataModel.m_secene.fish_score == nil then
+        return
+    end
     self.m_cannonLayer:onEventUserStatus(useritem, newstatus, oldstatus)
 
     -- self:setUserMultiple()
@@ -987,7 +1073,7 @@ function GameLayer:setUserMultiple()
     end
 
     -- 设置炮台倍数
-    for i = 1, 10 do
+    for i = 1, 8 do
 
         local pos = i - 1
         pos = CannonSprite.getPos(self._dataModel.m_reversal, pos)
@@ -1004,8 +1090,7 @@ end
 function GameLayer:onEventGameScene(cbGameStatus, dataBuffer)
 
     --print("场景数据")
-
-
+  
     if self.m_bScene then
         self:dismissPopWait()
         return
@@ -1020,6 +1105,7 @@ function GameLayer:onEventGameScene(cbGameStatus, dataBuffer)
 
     self.Copylscore = self.m_pUserItem.lScore - self.ScoreCount
 
+    self.CurrShoot = { { } }
     for i = 1, Game_CMD.GAME_PLAYER do
         table.insert(self.CurrShoot[1], self._dataModel.m_secene.MinShoot)
     end
@@ -1035,6 +1121,17 @@ function GameLayer:onEventGameScene(cbGameStatus, dataBuffer)
     self.CellShoot = self._dataModel.m_secene.MinShoot
     self:setUserMultiple()
     self:dismissPopWait()
+
+    if self.reGameOption == true then
+        --再调用 userGameEnter 把桌上的玩家重新进入一边
+        local nowTable = self.m_pUserItem.wTableID
+		for k,v in pairs(self._gameFrame._UserList) do
+			if nowTable == v["wTableID"]  then
+				self:onEventUserEnter(v["wTableID"],v["wChairID"],v)
+			end 
+		end
+    end
+ 
 end
 
 -- 游戏消息
@@ -1275,6 +1372,9 @@ end
 
 --停止超级炮
 function GameLayer:onSubStopSuperPao(databuffer)
+    if self._dataModel.m_secene.MaxShoot == nil then
+        return
+    end
     local data = ExternalFun.read_netdata(Game_CMD.CMD_S_BulletIonTimeout, databuffer)
     local chairId = data.chair_id
     local cannonPos = CannonSprite.getPos(self._dataModel.m_reversal, chairId)
@@ -1286,6 +1386,9 @@ end
 
 -- 更新总分
 function GameLayer:onSubUpdateAllScore(databuffer)
+    if self._dataModel.m_secene.fish_score == nil  or self._dataModel.m_secene == nil  then
+       return
+    end
     local data = ExternalFun.read_netdata(Game_CMD.CMD_S_UpdateAllScore, databuffer)
     local chairId = data.wChairID
     
@@ -1455,7 +1558,9 @@ function GameLayer:onSubSupplyTip(databuffer)
 end
 
 function GameLayer:onSubMultiple(databuffer)
-
+    if self._dataModel.m_secene.fish_score == nil   then
+        return
+    end
     local mutiple = ExternalFun.read_netdata(Game_CMD.CMD_S_ExchangeFishScore, databuffer)
     local cannonPos = mutiple.chair_id
     cannonPos = CannonSprite.getPos(self._dataModel.m_reversal, cannonPos)
@@ -1565,13 +1670,12 @@ end
 -- 切换场景
 function GameLayer:onSubExchangeScene(dataBuffer)
 
-    print("场景切换")
+    --print("场景切换")
 
     self.iffishcomb = true
     local count = math.floor(dataBuffer:getlen() / 1508)
     if count >= 1 then
         local FishComb = ExternalFun.read_netdata(Game_CMD.CMD_S_SwitchScene, dataBuffer)
-        dump(FishComb)
         -- 鱼阵数据
         exchangeScene = FishComb.scene_kind % 5
 
@@ -1893,7 +1997,9 @@ function GameLayer:onSubCreateMoreFishd(databuffer)
 end
 
 function GameLayer:onBackScore(databuffer)
-
+    if self._dataModel.m_secene == nil or self._dataModel.m_secene.fish_score == nil then
+        return
+    end
     local score = ExternalFun.read_netdata(Game_CMD.CMD_S_FishMissed, databuffer)
 
     local cannonPos = score.chair_id
@@ -1902,6 +2008,11 @@ function GameLayer:onBackScore(databuffer)
 
     local cannon = self.m_cannonLayer:getCannoByPos(cannonPos + 1)
 
+    --移除鱼
+    local fish = self._dataModel.m_fishList[score.fish_id]
+    if fish ~= nil then
+        fish.ifdie = true
+    end
 
     if self.m_cannonLayer ~= nil then
         if score.chair_id == self.m_nChairID then
@@ -1933,6 +2044,9 @@ function GameLayer:onSubFire(databuffer)
 
 
     if not self.m_cannonLayer then
+        return
+    end
+    if self._dataModel.m_secene.fish_score == nil then
         return
     end
 
@@ -1989,11 +2103,6 @@ function GameLayer:onSubFishCatch(databuffer)
                         end
 
                         if nil ~= fish then
-
---                            if fish.m_data ~= nil and fish.m_data.fish_kind == Game_CMD.FishType_BaoXiang then  --打中宝箱
-
---                                break
---                            end
 
                             local smallSound = string.format("sound_res/samll_%d.mp3", math.random(5))
 
@@ -2129,6 +2238,8 @@ function GameLayer:onQueryExitGame()
 
     self._queryDialog = QueryDialog:create("您要退出游戏么？", function(ok)
         if ok == true then
+            self.isEightFour = true
+            self:showPopWait()
             self:runAction(cc.Sequence:create(
             cc.DelayTime:create(delayLeaveTime),
             cc.CallFunc:create(

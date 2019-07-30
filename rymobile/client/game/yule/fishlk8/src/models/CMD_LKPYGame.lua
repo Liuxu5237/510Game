@@ -373,7 +373,8 @@ cmd.CMD_S_FishCreate =
 cmd.CMD_S_FishMissed = 
 {
     {k="chair_id",t="word"},
-    {k="bullet_mul",t="int"}
+    {k="bullet_mul",t="int"},
+    {k="fish_id",t="int"}
 }
 cmd.FPoint = 
 {

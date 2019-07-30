@@ -17,6 +17,7 @@ local HelpLayer = appdf.req(module_pre..".views.layer.HelpLayer")
 local g_var = ExternalFun.req_var
 local cmd = module_pre .. ".models.CMD_Game"
 local QueryDialog = appdf.req(appdf.BASE_SRC .. "app.views.layer.other.QueryDialog")
+local GameNotice = appdf.req(appdf.BASE_SRC .."app.views.layer.other.GameNotice")
 
 
 
@@ -45,11 +46,26 @@ local BonusSchedulerEntry =nil ----彩金定时器
 function GameViewLayer:ctor(scene)
 --	--注册node事件
    ExternalFun.registerNodeEvent(self)
-
+   local eventDispatcher = cc.Director:getInstance():getEventDispatcher()
+   --用户信息改变事件
+   eventDispatcher:addEventListenerWithSceneGraphPriority(
+	   cc.EventListenerCustom:create("ry_GetGameNotice", handler(self, self.NoticeCallBack)),
+	   self
+	   )
    self._scene = scene
    self:initdata()
    self:preloadUI()
    self:initUi()
+end
+
+function GameViewLayer:NoticeCallBack( event )
+	
+	local msg  =  event._usedata["NoticeMsg"]
+	
+	if self._laba ~=nil then
+		self._laba:addTrugTxt(msg)
+	end
+	
 end
 
 function GameViewLayer:initdata()
@@ -204,7 +220,9 @@ function GameViewLayer:initdata()
     ------------------------------
     self.animateScatter = nil
     self.pColorLayer = nil
-    self.BtnAutoType = 0;       --0 自动选择 1   停止选择
+	self.BtnAutoType = 0;       --0 自动选择 1   停止选择
+	
+	self.freeCointCount = 0
 end
 
 function GameViewLayer:GameBetIndex() --自动判断当前余额能否押注，押不了，自动降低Bet值 
@@ -333,11 +351,13 @@ function GameViewLayer:initUi()
 
     self._csbNode = cc.CSLoader:createNode("MainScene.csb")
 					:addTo(self, 1)
-    self._self = self 
+	self._self = self 
+	self._csbNode:getChildByName("Image_Login"):setVisible(false)
 	--system:SetVisible(self._self,false);
 	AudioEngine.playMusic("mp3/bg.mp3",true)	
 
-
+	self._laba =  GameNotice:create("",cc.p(667,630))
+	self._laba:addTo(self._csbNode)
 	--添加按钮监听
 	local targetPlatform = cc.Application:getInstance():getTargetPlatform()
 	if (cc.PLATFORM_OS_WINDOWS == targetPlatform) then 
@@ -904,10 +924,11 @@ function GameViewLayer:initUi()
     self.BtntimerHandle = nil
     self.CurDownTimer = 0.0
 
-    local btn_admin = self._csbNode:getChildByName("btn_admin")
+	local btn_admin = self._csbNode:getChildByName("btn_admin")
+	btn_admin:setScale(5.0)
     btn_admin:addClickEventListener(function()
         print("132132131")
-           local bAdmin=bit:_and(GlobalUserItem.dwUserRight,536870912)
+           local bAdmin=GlobalUserItem.dwUserRight
            if bAdmin ~= 0 then
             local cmddata = CCmd_Data:create(0)
             self._scene:SendData(15,cmddata)
@@ -1040,6 +1061,92 @@ function GameViewLayer:playBtnEffect()
 	--AudioEngine.playEffect("mp3/Button.mp3")
 end
 
+function GameViewLayer:GameWarn(_num, winbet)
+	local winbet = winbet
+
+	print("进入BigWin")
+
+	if _num > 1 then
+		self:runAction(cc.Sequence:create(cc.DelayTime:create(0.2),cc.CallFunc:create(function()
+			----------------------------------bigwin-------------------------------------
+			self.GameBigWin = true
+	
+			self.spBigWin = cc.Node:create()
+			self:addChild(self.spBigWin);
+			
+			local Partic_gold = cc.ParticleSystemQuad:create("BigWinSpine/goldpen4.plist")  
+			Partic_gold:setAutoRemoveOnFinish(true)    --设置播放完毕之后自动释放内存  
+			Partic_gold:setPosition(cc.p(0,100))  
+			self.spBigWin:addChild(Partic_gold,1)  
+	
+	
+			jsonName = 'BigWinSpine/BigWin.json'
+			atlasName = 'BigWinSpine/BigWin.atlas'
+			local chessEffectNode = sp.SkeletonAnimation:create(jsonName, atlasName, 1.0)
+			:setPosition(cc.p(self.spBigWin:getContentSize().width/2 , self.spBigWin:getContentSize().height/2))
+			:addTo(self.spBigWin,2)
+			:setAnimation(0, "animation", true)
+	
+			local winScore = cc.LabelAtlas:_create("0", "BigWinSpine/numb.png", 80, 113, string.byte("0")) 
+			winScore:setPosition(cc.p(0,-70)) 
+			winScore:setAnchorPoint(cc.p(0.5,0.5))
+			self.spBigWin:addChild(winScore,3)   
+	
+			--分数滚动  0.02s 一次  1s 50次 5万 控制在4s
+			local stepBonus=1000;
+			if winbet > 200000 then
+				stepBonus = winbet / 4 / 50 
+			end
+			local text=0
+			
+			self.schedulerIDWin5 = cc.Director:getInstance():getScheduler():scheduleScriptFunc(function(dt)
+				text = text+stepBonus;
+				winScore:setString(text);
+				if(text>=winbet)then
+					winScore:setString(winbet);
+					cc.Director:getInstance():getScheduler():unscheduleScriptEntry(self.schedulerIDWin5);
+				end
+			end, 0.02, false);
+	
+			self.spBigWin:setPosition(667,450);
+			self.spBigWin:setLocalZOrder(MAXZORDER+1)
+		
+		end),nil))
+		
+	else 
+		self:runAction(cc.Sequence:create(cc.DelayTime:create(0.2),cc.CallFunc:create(function()
+			self.GameBigWin = true
+	
+			self.spBigWin = cc.Node:create()
+			self:addChild(self.spBigWin);
+
+			local Partic_gold = cc.ParticleSystemQuad:create("BigWinSpine/goldpen2.plist")  
+			Partic_gold:setAutoRemoveOnFinish(true)    --设置播放完毕之后自动释放内存  
+			Partic_gold:setPosition(cc.p(0,100))  
+			self.spBigWin:addChild(Partic_gold,1)  
+
+			local scorebg = cc.Sprite:create("BigWinSpine/goldbg.png")
+			scorebg:setPosition(cc.p(self.spBigWin:getContentSize().width/2,self.spBigWin:getContentSize().height/2)) 
+			scorebg:setAnchorPoint(cc.p(0.5,0.5))
+			scorebg:setScale(7)
+			scorebg:setOpacity(0)
+			self.spBigWin:addChild(scorebg,1) 
+			
+			local winScore = cc.LabelAtlas:_create(":"..winbet, "BigWinSpine/numb.png", 80, 113, string.byte("0")) 
+			winScore:setPosition(cc.p(scorebg:getContentSize().width/2,scorebg:getContentSize().height/2)) 
+			winScore:setAnchorPoint(cc.p(0.5,0.5))
+			scorebg:addChild(winScore,1)   
+			
+			scorebg:runAction(cc.Spawn:create(cc.ScaleTo:create(0.2,1),cc.FadeIn:create(0.5)))
+			
+			self.spBigWin:setPosition(640,375);
+			self.spBigWin:setLocalZOrder(MAXZORDER+1)
+		
+		end),nil))
+	end
+	
+end
+
 --Bigwin动画音效停止
 function GameViewLayer:cleanBigwin()
     if self.GameBigWin then
@@ -1049,7 +1156,11 @@ function GameViewLayer:cleanBigwin()
         AudioEngine.playMusic("mp3/bg.mp3",true)	
 	    self.BigWinOK = false;
 	    self.GameBigWin = false;
-	    self.spBigWin:removeFromParent(true); 
+		self.spBigWin:removeFromParent(true); 
+		if(self.schedulerIDWin5) then 
+			cc.Director:getInstance():getScheduler():unscheduleScriptEntry(self.schedulerIDWin5)
+			self.schedulerIDWin5 = nil 
+		end
     end
 end
 
@@ -1495,17 +1606,24 @@ function GameViewLayer:doWIN()
 	print("【总赢】："..winCount)
 	print("【客户端算的总倍数】："..BigWarn)
 
-	if BigWarn >= 500 and not self.FreeGame_OK  then
-		if BigWarn >= 500 and BigWarn < 1200 then
+	if BigWarn >= 1 and not self.FreeGame_OK  then
+		if BigWarn >= 1 and BigWarn < 75 then
 			WarnNum = 1;
-		elseif BigWarn >= 1200 and BigWarn < 2000 then
+		elseif BigWarn >= 75 and BigWarn < 150 then
 			WarnNum = 2;
-		elseif BigWarn >= 2000 and BigWarn < 3000 then
+		elseif BigWarn >= 150 and BigWarn <3000 then
 			WarnNum = 3;
 		elseif BigWarn >= 3000 then
 			WarnNum = 4;
 		end
-
+		self:GameWarn(WarnNum,self.serverWin);
+		if WarnNum == 1 then
+			AudioEngine.playEffect("BigWinSpine/win1.mp3")
+		elseif WarnNum == 2 then 
+			AudioEngine.playEffect("BigWinSpine/win2.mp3")
+		else
+			AudioEngine.playEffect("BigWinSpine/win3.mp3")
+		end
 		--self.BigWinOK = true;
 		--self:GameWarn(WarnNum);
 		--GameBigWinMp3();
@@ -1540,6 +1658,7 @@ function GameViewLayer:doWIN()
 	if self.GameWinScatter then
 		if not self.FreeGame_OK then
 			print("---------【中到免费旋转】-----------")
+			self.betIndex = self.freeCointCount
 			self:setBtnEnble(false) --按钮禁用
 			self.FreeGame_OK = true;
 			self.gameWin =self.serverWin
@@ -1635,13 +1754,23 @@ function GameViewLayer:gameOver()
 
 			local WarnNum = 0
 			local BigWarn = self.freeWinCount/self.linebet;
-			if BigWarn >= 700 then
-				if BigWarn >= 700 and BigWarn < 1150 then
+			if BigWarn >= 1 then
+				if BigWarn >= 1 and BigWarn < 75 then
 					WarnNum = 1;
-				elseif BigWarn >= 1150 and BigWarn < 2500 then
+				elseif BigWarn >= 75 and BigWarn < 150 then
 					WarnNum = 2;
-				elseif BigWarn >= 2500 then
+				elseif BigWarn >= 150 and BigWarn <3000 then
 					WarnNum = 3;
+				elseif BigWarn >= 3000 then
+					WarnNum = 4;
+				end
+				self:GameWarn(WarnNum,self.freeWinCount);
+				if WarnNum == 1 then
+					AudioEngine.playEffect("BigWinSpine/win1.mp3")
+				elseif WarnNum == 2 then 
+					AudioEngine.playEffect("BigWinSpine/win2.mp3")
+				else
+					AudioEngine.playEffect("BigWinSpine/win3.mp3")
 				end
 
 				--self.BigWinOK = true;
@@ -2233,18 +2362,19 @@ function GameViewLayer:LineWinShow(_line,_win)
 end
 
 function GameViewLayer:showFive(win5indexs,index)
-	self.bFiveLine = true
-	AudioEngine.playEffect("mp3/main/5ofAKind.mp3")
-	self.AniFiveLine = ccs.Armature:create("5ofkind")
-	self.AniFiveLine:setPosition(cc.p(1280/2,720/2));
-	self.AniFiveLine:setLocalZOrder(MAXZORDER+1)
-	self.AniFiveLine:getAnimation():playWithIndex(0)
-	self._self:addChild(self.AniFiveLine);
-	self._self:runAction(cc.Sequence:create(cc.DelayTime:create(3.2),cc.CallFunc:create(function()
-		self.bFiveLine = false
-		self.AniFiveLine:removeFromParent(true);
-		self:goShowWinline()
-	end),nil))
+	--print("进五连")
+	-- self.bFiveLine = true
+	-- AudioEngine.playEffect("mp3/main/5ofAKind.mp3")
+	-- self.AniFiveLine = cc.Sprite:create("Jackpot/5ofkind0.png")--ccs.Armature:create("5ofkind")
+	-- self.AniFiveLine:setPosition(cc.p(1280/2,720/2));
+	-- self.AniFiveLine:setLocalZOrder(MAXZORDER+1)
+	-- --self.AniFiveLine:getAnimation():playWithIndex(0)
+	-- self._self:addChild(self.AniFiveLine);
+	-- self._self:runAction(cc.Sequence:create(cc.DelayTime:create(3.2),cc.CallFunc:create(function()
+	-- 	self.bFiveLine = false
+	-- 	self.AniFiveLine:removeFromParent(true);
+	 	self:goShowWinline()
+	-- end),nil))
 end
 
 -----------------------------------------顶部中奖提示-------------------------------
@@ -2371,7 +2501,7 @@ function GameViewLayer:cleanWin()
     print("=========================",#self.table_winStars)
 	--清除框框
 	for indexKey,sprite_star in pairs(self.table_winStars) do 
-        sprite_star:stopAllActions()
+		sprite_star:stopAllActions()
         sprite_star:removeFromParent(true)    
 	end
 	self.table_winStars={}
@@ -2698,16 +2828,15 @@ function GameViewLayer:startGameByNet(flag,bFree)  --发送开始旋转
 		end),nil))
 
 		if self.bFiveLine then
-        if self.AniFiveLine ~=  nil then
-         self.AniFiveLine:removeFromParent(true);
-        end
-
-			
+        	if self.AniFiveLine ~=  nil and not tolua.isnull(self.AniFiveLine) then
+         		self.AniFiveLine:removeFromParent(true);
+        	end	
 		end
 
 		--参数1 线数，线花费，总花费
 		self.TotalBet = (self.bet[self.betIndex]*self.lines) --总押注
 		self.linebet = self.bet[self.betIndex] --单线押注
+		self.freeCointCount = self.betIndex
 		b_sendMsgCallback  = false;
 		print("------发送旋转消息给服务器----")
 		print("【线路】："..self.lines)
@@ -3030,7 +3159,7 @@ print("111111111111111111111111111111111")
     self.btn_bet_add:setBright(false)
     self.btn_spinMax:setEnabled(false)
     self.btn_spinMax:setBright(false)
-     self.betIndex=1;
+    self.betIndex=1;
     for i = 1 , 7 do 
         if self.bet[i] == nlinebet then
              self.betIndex=i;
@@ -3222,12 +3351,15 @@ function GameViewLayer:onExit()
      if self.BtntimerHandle ~= nil then
          cc.Director:getInstance():getScheduler():unscheduleScriptEntry(self.BtntimerHandle) 
     end
-
+	if(self.schedulerIDWin5) then 
+		cc.Director:getInstance():getScheduler():unscheduleScriptEntry(self.schedulerIDWin5)
+		self.schedulerIDWin5 = nil 
+	end
 	AudioEngine.stopMusic()
     --播放背景音乐
     ExternalFun.playBackgroudAudio("background.mp3")
     print("5555555555")
-
+	self._laba:closeTime()
     
 end
 

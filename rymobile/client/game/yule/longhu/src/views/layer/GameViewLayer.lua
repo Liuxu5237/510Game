@@ -30,6 +30,8 @@ local GameResultLayer = module_pre .. ".views.layer.GameResultLayer"
 
 local scheduler = cc.Director:getInstance():getScheduler()
 
+local GameNotice = appdf.req(appdf.BASE_SRC .."app.views.layer.other.GameNotice")
+
 --
 --用户头像
 local HeadSprite = appdf.req(appdf.EXTERNAL_SRC .. "HeadSprite")
@@ -226,9 +228,29 @@ function GameViewLayer:gameDataInit( )
 --     self.SingleTable[2]=2
 --      self.SingleTable[3]=3
 --    self:CopyNexSinger()
-   
+
+    --庄稼钱
+    self.bankScore = nil
+    local eventDispatcher = cc.Director:getInstance():getEventDispatcher()
+    --用户信息改变事件
+	eventDispatcher:addEventListenerWithSceneGraphPriority(
+        cc.EventListenerCustom:create("ry_GetGameNotice", handler(self, self.NoticeCallBack)),
+        self
+        )
 
 end
+
+function GameViewLayer:NoticeCallBack( event )
+
+    local msg  =  event._usedata["NoticeMsg"]
+
+    if self._laba ~=nil then
+        self._laba:addTrugTxt(msg)
+    end
+
+end
+
+
 --初始化按钮
 function GameViewLayer:InitGameBtns(csbParent)
    	--按钮列表
@@ -280,7 +302,12 @@ function GameViewLayer:onChangeBanker( wBankerUser, lBankerScore, bEnableSysBank
 	--庄家姓名
 	if true == bEnableSysBanker then --允许系统坐庄
 		if yl.INVALID_CHAIR == wBankerUser then
-			nickstr = "系统坐庄"
+            nickstr = "系统坐庄"
+            --如果异常出现0 手动改
+            if lBankerScore == 0 then
+                print("系统金币异常")
+                lBankerScore = 10000000
+            end
 		else
 			local userItem = self:getDataMgr():getChairUserList()[wBankerUser + 1];
 			if nil ~= userItem then
@@ -645,8 +672,10 @@ end
 --网络接收
 function GameViewLayer:onGetUserScore( item )
 	--自己
-	if item.dwUserID == GlobalUserItem.dwUserID then
-       self:reSetUserInfo()
+    if item.dwUserID == GlobalUserItem.dwUserID then
+        self:runAction(cc.Sequence:create(cc.DelayTime:create(15.0),cc.CallFunc:create(function (  )
+            self:reSetUserInfo()
+        end)))
     end
 
 --    --坐下用户
@@ -667,7 +696,11 @@ function GameViewLayer:onGetUserScore( item )
 		--end
 		local str = ExternalFun.numberThousands(item.lScore)
         local strRef = string.gsub(str, ",", ":")
-	    self.m_textBankerCoin:setString(strRef);
+
+        --self.m_textBankerCoin:setString(strRef);
+
+        self.bankScore = strRef
+       
     end
 
 --    --系统坐庄也要扣钱
@@ -833,6 +866,8 @@ function GameViewLayer:onExit()
     scheduler:unscheduleScriptEntry(self.m_schedule)
     scheduler:unscheduleScriptEntry(self.m_Plerschedule)
 
+    self._laba:closeTime()
+
 end
 
 function GameViewLayer:schedulerUpdate() 
@@ -897,6 +932,11 @@ function GameViewLayer:initCsbRes(  )
 			self:onJettonButtonClicked(sender:getTag(), sender);
 		end
 	end
+
+    
+   self._laba =  GameNotice:create("",cc.p(667,630))
+   self._laba:addTo(self.m_rootLayer)
+
 
 	self.m_pJettonNumber = 
 	{
@@ -1133,8 +1173,15 @@ function GameViewLayer:onButtonClickedEvent(tag,ref)
 	       self.BtnPlaertView:runAction(actHideAct)
            self.bShowParent = false
         end
-	elseif tag == TAG_ENUM.BT_EXIT then
-		self:getParentNode():onQueryExitGame()
+    elseif tag == TAG_ENUM.BT_EXIT then
+
+        if  self.m_cbGameStatus  == 1  or self.m_cbGameStatus== 100   then
+            if self:isMeChair(self.m_wBankerUser) == true then
+                showToast(self,"上庄期间不允许离开游戏，耐心等待吧~",2)
+                return
+            end
+        end
+		self._scene:onExitTable()
               --关闭暗流列表
         if self.BtnPlaertView:isVisible() then
            local Paren = cc.ScaleTo:create(0.25, 1.0, 0.0)
@@ -1684,14 +1731,25 @@ function GameViewLayer:onJettonAreaClicked( tag, ref )
     if true == self:isMeChair(self.m_wBankerUser) then
       return ;
     end
-
-	local area = tag - 1;	
+    
+    local area = tag - 1;	
+    if self.m_llMaxJetton == 0 then
+        print("异常")
+        self.m_llMaxJetton = 10000000
+    end
 	if self.m_lHaveJetton > self.m_llMaxJetton then
 		showToast(self,"已超过最大下注限额",1)
 		self.m_lHaveJetton = self.m_lHaveJetton - m_nJettonSelect;
 		return;
 	end
-
+    if m_nJettonSelect>10000000  then
+     --异常
+     self:getParentNode():sendUserTryBet(area, m_nJettonSelect,GlobalUserItem.lUserScore,self.m_lHaveJetton);	
+    end
+    if m_nJettonSelect<=0  then
+     --异常
+     self:getParentNode():sendUserTryBet(area, m_nJettonSelect,GlobalUserItem.lUserScore,self.m_lHaveJetton);	
+    end
 	--下注
 	self:getParentNode():sendUserBet(area, m_nJettonSelect);	
 
@@ -2470,7 +2528,7 @@ end
 function GameViewLayer:initUserInfo(  )	
 	--玩家头像
 	local tmp = self.m_spBottom:getChildByName("player_head")
-    local head =HeadSprite:createNormal(self:getMeUserItem(), 55)
+    local head =HeadSprite:createNormal(GlobalUserItem, 55)
 	head:setPosition(tmp:getPosition())
 	self.m_spBottom:addChild(head)
 	--head:enableInfoPop(false)
@@ -2496,7 +2554,7 @@ function GameViewLayer:initUserInfo(  )
      self.GameOverWinImage = self.GameNods:getChildByName("OverGame_Image_Win");
      self.GameOverWinImage:setLocalZOrder(1110)
      self.GameOverWinImage:setScale(0)
-     local head =HeadSprite:createNormal(self:getMeUserItem(), 55)
+     local head =HeadSprite:createNormal(GlobalUserItem, 55)
 	 head:setPosition(cc.p(415.90,200))
 	 self.GameOverWinImage:addChild(head)
      --结束昵称
@@ -2521,7 +2579,7 @@ function GameViewLayer:initUserInfo(  )
      self.GameOverLostImage = self.GameNods:getChildByName("OverGame_Image_Lost");
      self.GameOverLostImage:setLocalZOrder(1111)
      self.GameOverLostImage:setScale(0)
-     local head =HeadSprite:createNormal(self:getMeUserItem(), 55)
+     local head =HeadSprite:createNormal(GlobalUserItem, 55)
 	 head:setPosition(cc.p(415.90,200))
 	 self.GameOverLostImage:addChild(head)
      --结束昵称
@@ -2547,6 +2605,16 @@ end
 
 --显示结束面板
 function GameViewLayer:ShowGameOver(WinScore , PoolScore , ScrentAnime)
+    
+    --刷新庄家成绩
+    if self.bankScore~= nil then
+       
+        if yl.INVALID_CHAIR ~= self.m_wBankerUser then --系统坐庄
+            self.m_textBankerCoin:setString(self.bankScore);
+        end 
+        self.bankScore = nil
+    end
+    
     --判断是否显示结束
   local ll = 0;
   local bShowOver = false
@@ -2561,6 +2629,9 @@ function GameViewLayer:ShowGameOver(WinScore , PoolScore , ScrentAnime)
         return ;
     end
   end
+
+   --刷新金币
+   self:reSetUserInfo()
 
     local GameOverPalter = self.GameOverWinImage;
     if WinScore<0 then
@@ -2639,7 +2710,6 @@ end
 function GameViewLayer:UpdateStore(StoreScore)
  self.m_TextField_Storeder:setText(StoreScore)
 end
-
 function GameViewLayer:onContorlButtonClicked( tag, ref )
 
 
@@ -2749,12 +2819,12 @@ end
 --用户列表
 function GameViewLayer:onUserInfo( UserInfoTable )
 
-    --绘制库存信息
-    self.m_ListUserContorl:removeAllChildren()
+ --绘制库存信息
+ self.m_ListUserContorl:removeAllChildren()
  	self._itemInfo = {}
  	local admin = UserInfoTable.FishServerInfo[1]
  	print(UserInfoTable.cbColumnCount)
-
+     dump(admin)
  	for i = 1, UserInfoTable.cbColumnCount do	
        if i == 1 then
          self.m_AllWinScoreText:setString(admin[i].wRoomWinLost)

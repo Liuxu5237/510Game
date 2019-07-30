@@ -120,7 +120,7 @@ function AdminLayer:ctor(delegate,data)
 	self:onSendRefreshinfo()
 end
 
-function AdminLayer:onRefreshUserList(userlist)
+function AdminLayer:onRefreshUserList(userlist1)
 	--[[ "<var>" = {
      "Counent" = 1
      "Kongzhi" = {
@@ -128,13 +128,19 @@ function AdminLayer:onRefreshUserList(userlist)
          "lScoreLimit"  = -10000
          "probability"  = 50
      }
- 	}]]
+	 }]]
+	local cout11 = userlist1:readbyte()
+	local userlist = {}
+	for i=1,cout11 do
+		userlist[i] = ExternalFun.read_netdata(g_var(cmd).CMD_C_KongZhi,userlist1)
+	end
+
  	self._userLiserView:removeAllChildren()
  	self._itemInfo = {}
- 	local admin = userlist.Kongzhi[1]
- 	self._adminCount = userlist.Counent
- 	print(userlist.Counent)
- 	for i = 1, userlist.Counent do
+ 	local admin = userlist
+ 	self._adminCount = cout11
+ 	--print(userlist.Counent)
+ 	for i = 1, #userlist do
  		if i > g_var(cmd).ITEM_MAX then
  			showToast(nil, "控制成员超过上限", 2)
  			break;

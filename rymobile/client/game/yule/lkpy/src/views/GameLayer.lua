@@ -2652,22 +2652,12 @@ function GameLayer:onSubFishCatchT(dataBuffer, _type)
             local emitter = nil
             
             if self._dataModel.m_fishList[catch_bird.bird_id_] == nil then
-                --print("空fishID : " ..catch_bird.bird_id_)
+               -- print("空fishID : " ..catch_bird.bird_id_)
                 local curgold1 = self.m_cannonLayer:getFishGold(catch_bird.chair_id_+1)
-                if catch_bird.chair_id_ == self.m_nChairID then
-                    --设置分数
-                    
-                    self.m_cannonLayer:setFishGold(self.m_nChairID+1, curgold1 + catch_bird.catch_gold_)
-                    self._gameView:setCurGold( curgold1 + catch_bird.catch_gold_)
-                 
-                else 
-                    --先这样
-                    if curgold1 == nil then
-                        return
-                    end
-                    self.m_cannonLayer:setFishGold(catch_bird.chair_id_+1,  curgold1 + catch_bird.catch_gold_)
-                end
-
+                self.m_cannonLayer:setFishGold(self.m_nChairID+1, curgold1 + catch_bird.catch_gold_)
+                self._gameView:setCurGold( curgold1 + catch_bird.catch_gold_)
+                print("FishScore : " .. catch_bird.catch_gold_ .. "  kindID "  .. catch_bird.award_type_ 
+                .. "   Score:" .. curgold1 + catch_bird.catch_gold_ )
                 return
             end
             
@@ -2908,23 +2898,13 @@ function GameLayer:on_sub_catch_bird_chain(dataBuffer )
             local emitter = nil
             
             if self._dataModel.m_fishList[catch_bird.bird_id_] == nil then
-                if catch_bird.chair_id_ == self.m_nChairID then
-                    --设置分数
-                    print("134 msg FishScore : " .. catch_bird.catch_gold_ .. "  kindID "  .. catchKindID 
-                    .. "   Score:" .. curgold1 + catch_bird.catch_gold_ )
-                    
-                    self.m_cannonLayer:setFishGold(self.m_nChairID+1, curgold1 + catch_bird.catch_gold_)
-                    self._gameView:setCurGold( curgold1 + catch_bird.catch_gold_)
-                 
-                else 
-                    --先这样
-                    if curgold1 == nil then
-                        return
-                    end
-                    self.m_cannonLayer:setFishGold(catch_bird.chair_id_+1,  curgold1 + catch_bird.catch_gold_)
-                end
-
-                return           
+                local curgold1 = self.m_cannonLayer:getFishGold(catch_bird.chair_id_+1)
+                self.m_cannonLayer:setFishGold(self.m_nChairID+1, curgold1 + catch_bird.catch_gold_)
+                self._gameView:setCurGold( curgold1 + catch_bird.catch_gold_)
+                print("134 msg FishScore : " .. catch_bird.catch_gold_ .. "  kindID "  .. catch_bird.award_type_ 
+                .. "   Score:" .. curgold1 + catch_bird.catch_gold_ )
+                return
+                
             end
             
            

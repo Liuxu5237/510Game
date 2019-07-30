@@ -23,7 +23,7 @@ local cmd = {}
 ]]
 
 --游戏版本
-cmd.VERSION 					= appdf.VersionValue(6,7,0,1)
+cmd.VERSION 					= "7.0.1"--appdf.VersionValue(6,7,0,1)
 --游戏标识
 cmd.KIND_ID						= 122
 	
@@ -212,7 +212,7 @@ cmd.tagOffUserInfo =
     {k = "wOnlineNumber", t = "word"},						    --在线人数、
     {k = "wRoomWinLost", t = "int"},                          --房间总输赢（全部）
     {k = "wToDayLoset", t = "int"},                           --房间总输赢（当前）
-    {k = "szUserName", t = "string", s = 32},					--房间名称
+    {k = "szUserName", t = "string", s = 16},					--房间名称
 
 }
 --在线列表

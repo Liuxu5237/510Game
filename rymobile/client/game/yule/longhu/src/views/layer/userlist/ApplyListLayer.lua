@@ -94,6 +94,7 @@ end
 
 function ApplyListLayer:refreshList( userlist )
 	self:setVisible(true)
+	dump(userlist)
 	self.m_userlist = userlist
 	self.m_tableView:reloadData()
 

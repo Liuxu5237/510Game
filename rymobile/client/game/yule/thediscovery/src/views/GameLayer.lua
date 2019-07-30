@@ -138,9 +138,9 @@ function GameLayer:onEventGameMessage(sub,dataBuffer)
     elseif sub == g_var(cmd).SUB_C_REQUEST_S_USERROSTER then
     	if not appdf.isObject(self._adminLayer) then
     		return
-    	end
-    	local cmd_table = ExternalFun.read_netdata(g_var(cmd).CMD_S_KongZhi,dataBuffer)
-    	self._adminLayer:onRefreshUserList(cmd_table)
+		end
+    	--local cmd_table = ExternalFun.read_netdata(g_var(cmd).CMD_S_KongZhi,dataBuffer)
+    	self._adminLayer:onRefreshUserList(dataBuffer)
 	end 
 end
 
@@ -158,6 +158,12 @@ function GameLayer:onEventUserStatus(useritem,newstatus,oldstatus)
     end
 
 
+end
+
+function  GameLayer:onEventUserStatus( useritem,newstatus,oldstatus )
+	if newstatus.cbUserStatus == 2 then
+		self:sendReady()
+	end
 end
 
 return GameLayer

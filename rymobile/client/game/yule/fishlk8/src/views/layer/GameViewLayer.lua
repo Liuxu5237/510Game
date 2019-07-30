@@ -1324,9 +1324,21 @@ function GameViewLayer:ShowCoin( score,wChairID,pos,fishtype )
           for i = 1, #cannon.m_goldList do
             local node = cannon.m_goldList[i]
             if node then
-                 node:runAction(cc.Sequence:create(cc.MoveBy:create(0.35,cc.p(tMoveX,tMoveY)),  cc.CallFunc:create(function()
-                    cannon:moveAllBannerAndGolds(node)
-                    end) ))
+                node:runAction(cc.Sequence:create(cc.MoveBy:create(0.35,cc.p(tMoveX,tMoveY)),  cc.CallFunc:create(function()
+                    if cannon.moveAllBannerAndGolds == nil then
+                        print("没了啊")
+                        -- local listCount = #cannon.m_goldList
+	                    -- if listCount >=1 then
+		                --     local tNode = cannon.m_goldList[1]
+		                --     if tNode.index == node.index then
+			            --         table.remove(cannon.m_goldList,1)
+			            --         tNode:removeFromParent(true)
+                        --     end
+                        -- end 
+                    else
+                        cannon:moveAllBannerAndGolds(node)
+                    end
+                end) ))
             end
            
           end

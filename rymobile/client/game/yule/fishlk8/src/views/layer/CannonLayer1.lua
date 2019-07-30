@@ -163,8 +163,12 @@ function CannonLayer:init()
 	table.insert(self.m_cannonList,cannonInfo)
 
     --dyj1
-    --(dyj)
-	local tMultipleValue = 1000 
+	--(dyj)
+	
+	local tMultipleValue = self._dataModel.m_secene.MinShoot 
+	if tMultipleValue==nil then
+		tMultipleValue = 1000
+	end
 	self:updateMultiple(tMultipleValue, pos + 1)
     --dyj2
 
@@ -483,6 +487,15 @@ function CannonLayer:showCannonByChair( chair , wChairID)
 	labelMutiple:setPosition(gunPlatformButtom:getContentSize().width/2,22)
 	if nil ~= wChairID and self.parent.CurrShoot~=nil then
 		local tMultipleValue = self.parent.CurrShoot[1][wChairID+1]
+		dump(self.parent.CurrShoot)
+		if self.parent.CurrShoot[1] == nil  or #self.parent.CurrShoot[1] <1 then
+			if self.parent.reGameOption == true then
+				return
+			end
+			self.parent._gameFrame:SendGameOption()
+			self.parent.reGameOption = true
+			return
+		end
 		labelMutiple:setString(string.format("%d",tMultipleValue))
 	end
 	gunPlatformButtom:removeChildByTag(1)

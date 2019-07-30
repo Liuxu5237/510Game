@@ -72,8 +72,8 @@ function Cannon:ctor(viewParent)
     self.fangle=0
     self.ifno = true
     self.fireSpeed = 0.24
-    self.m_otherLock = false
-	self.m_nCurrentBulletScore = 1000
+	self.m_otherLock = false
+	self.m_nCurrentBulletScore = viewParent._dataModel.m_secene.MinShoot  --1000
 	self.m_nMutipleIndex = 0
     
 	self.m_Type = Game_CMD.CannonType.Normal_Cannon--Game_CMD.CannonType.Laser_Cannon
@@ -229,12 +229,15 @@ function Cannon:setMultiple(multiple)
 	--print("mutiple is =========================="..multiple)
     if multiple == nil then
        return
-    end
-
+	end
+	if self.parent._dataModel.m_secene.MaxShoot == nil then
+		return
+	 end
 	self.m_nMutipleIndex = self.parent.parent.CurrShoot[1][self.m_ChairID+1]        -- multiple / self.parent.parent.CellShoot
 
 	local nMultipleValue = self.parent.parent.CurrShoot[1][self.m_ChairID+1]
 
+	--dump(self.parent.parent.CurrShoot)
 	self.m_nCurrentBulletScore = nMultipleValue
 
 	local nNum = 1
@@ -374,7 +377,6 @@ end
 
 --其他玩家开火
 function Cannon:othershoot( firedata )
-	
 	table.insert(self.m_firelist,firedata)
 	self:setMultiple(self.m_nMutipleIndex)
 	self.m_nCurrentBulletScore = firedata.bullet_mulriple
@@ -385,7 +387,6 @@ function Cannon:othershoot( firedata )
 	if self.m_Type == Game_CMD.CannonType.Special_Cannon then
 		time = time/1.5
 	end
-
 	self:otherSchedule(time)
 end
 
@@ -527,7 +528,7 @@ function Cannon:productBullet( isSelf,fishIndex, netColor,fire)
         return
     end
     if isSelf then
-        self.parent.m_bullet_cur_count = self.parent.m_bullet_cur_count + 1
+		self.parent.m_bullet_cur_count = self.parent.m_bullet_cur_count + 1
     end
 
     local angle = self.m_fort:getRotation()
@@ -577,7 +578,12 @@ function Cannon:productBullet( isSelf,fishIndex, netColor,fire)
     table.insert(self.parent.parent.bullet,bullet0)
 
 	if isSelf then
-
+		if self.parent.parent.isEightFour == true	 then
+			return
+		end
+		if self.m_nCurrentBulletScore == nil then
+			self:setMultiple(self._dataModel.m_secene.MinShoot)
+		end
 		self.parent.parent:setSecondCount(60)
 
 		local cmddata = CCmd_Data:create(29)
@@ -853,7 +859,6 @@ function Cannon:autoUpdate(dt)
     --dyj1
     local curScore = self.parent.parent.CurrShoot[1][self.m_nChairID+1]
     --dyj2
-	
 	if score < self.parent.parent.CurrShoot[1][self.m_nChairID+1] then
 		self:unAutoSchedule()
 		self.m_autoShoot = false

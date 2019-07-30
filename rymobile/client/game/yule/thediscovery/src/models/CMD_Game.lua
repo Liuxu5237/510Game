@@ -23,7 +23,7 @@ local cmd = cmd or {}
 ]]
 
 --游戏版本
-cmd.VERSION 					= appdf.VersionValue(6,7,0,1)
+cmd.VERSION 					= "7.0.1"--appdf.VersionValue(6,7,0,1)
 --游戏标识
 cmd.KIND_ID						= 2075
 	
